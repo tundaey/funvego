@@ -1,91 +1,111 @@
-import React from 'react';
-import { StyleSheet, Platform, Image, Text, View } from 'react-native';
+import React, {Component} from 'react';
+import { StyleSheet, Text, View } from 'react-native';
 
-import firebase from 'react-native-firebase';
+import { registerCustomIconType } from 'react-native-elements'
+import fontelloConfig  from './assets/fontello/config.json'
+import { createIconSetFromFontello } from 'react-native-vector-icons';
 
-export default class App extends React.Component {
-  constructor() {
-    super();
-    this.state = {
-      // firebase things?
-    };
+import { bindActionCreators } from 'redux'
+import { connect } from 'react-redux'
+import * as userActionCreators from './src/redux/modules/user'
+import { formatUserInfo } from './src/utils/utils'
+
+import Events from './src/components/Events'
+
+import LoginContainer from './src/container/LoginContainer'
+import SignupContainer from './src/container/SignupContainer'
+
+import { Switch, Route, NativeRouter, Redirect} from 'react-router-native'
+
+import firebase from 'react-native-firebase'
+
+function PrivateRoute ({component: Component, authed, ...rest}) {
+  return (
+    <Route
+      {...rest}
+      render={(props) => authed === true
+        ? <Component {...props} />
+        : <Redirect to={{pathname: '/', state: {from: props.location}}} />}
+    />
+  )
+}
+
+function PublicRoute ({component: Component, authed, ...rest}) {
+  console.log('authed', authed)
+  return (
+    <Route
+      {...rest}
+      render={(props) => authed === false
+        ? <Component {...props} />
+        : <Redirect to='/Events' />}
+    />
+  )
+}
+
+
+export class App extends React.Component {
+  state = {
+    fontLoaded: false,
+    authed: false,
+    loading: false
   }
 
   componentDidMount() {
-    // firebase things?
+      this.props.fetchUser()
+      registerCustomIconType(
+          'fontello',
+          createIconSetFromFontello(fontelloConfig)
+      )
+
+    this.setState({ fontLoaded: true });
+    firebase.auth().onAuthStateChanged((user)=> {
+      if(user){
+        const userData = user._user.providerData[0]
+        const userInfo = formatUserInfo(userData.displayName, userData.photoURL, userData.uid)
+        const uid = user._user.uid
+        this.props.authUser(uid)
+        this.props.fetchingUserSuccess(userInfo, uid)
+      }else{
+        console.log('props', this.props)
+        this.props.unAuthUser()
+        this.props.removeFetching()   
+        
+      }
+    })
+  }
+
+  componentWillUnmount(){
+    //this.authSubscription();
   }
 
   render() {
     return (
-      <View style={styles.container}>
-        <Image source={require('./assets/RNFirebase512x512.png')} style={[styles.logo]} />
-        <Text style={styles.welcome}>
-          Welcome to the React Native{'\n'}Firebase starter project!
-        </Text>
-        <Text style={styles.instructions}>
-          To get started, edit App.js
-        </Text>
-        {Platform.OS === 'ios' ? (
-          <Text style={styles.instructions}>
-            Press Cmd+R to reload,{'\n'}
-            Cmd+D or shake for dev menu
-          </Text>
-        ) : (
-          <Text style={styles.instructions}>
-            Double tap R on your keyboard to reload,{'\n'}
-            Cmd+M or shake for dev menu
-          </Text>
-        )}
-        <View style={styles.modules}>
-          <Text style={styles.modulesHeader}>The following Firebase modules are enabled:</Text>
-          {firebase.admob.nativeModuleExists && <Text style={styles.module}>Admob</Text>}
-          {firebase.analytics.nativeModuleExists && <Text style={styles.module}>Analytics</Text>}
-          {firebase.auth.nativeModuleExists && <Text style={styles.module}>Authentication</Text>}
-          {firebase.crash.nativeModuleExists && <Text style={styles.module}>Crash Reporting</Text>}
-          {firebase.firestore.nativeModuleExists && <Text style={styles.module}>Cloud Firestore</Text>}
-          {firebase.messaging.nativeModuleExists && <Text style={styles.module}>Messaging</Text>}
-          {firebase.perf.nativeModuleExists && <Text style={styles.module}>Performance Monitoring</Text>}
-          {firebase.database.nativeModuleExists && <Text style={styles.module}>Realtime Database</Text>}
-          {firebase.config.nativeModuleExists && <Text style={styles.module}>Remote Config</Text>}
-          {firebase.storage.nativeModuleExists && <Text style={styles.module}>Storage</Text>}
-        </View>
-      </View>
+      this.state.fontLoaded ? (
+        this.props.isFetching === false ? (
+          <NativeRouter>
+            <Switch>
+              <PublicRoute exact authed={this.props.isAuthed} path='/' component={LoginContainer} />
+              <PublicRoute exact authed={this.props.isAuthed} path='/Signup' component={SignupContainer} />
+              <PrivateRoute exact authed={this.props.isAuthed} path='/Events' component={Events} />
+            </Switch>
+          </NativeRouter>
+        ): null
+      ): <View><Text>Font not loaded</Text></View>
     );
   }
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#F5FCFF',
-  },
-  logo: {
-    height: 80,
-    marginBottom: 16,
-    width: 80,
-  },
-  welcome: {
-    fontSize: 20,
-    textAlign: 'center',
-    margin: 10,
-  },
-  instructions: {
-    textAlign: 'center',
-    color: '#333333',
-    marginBottom: 5,
-  },
-  modules: {
-    margin: 20,
-  },
-  modulesHeader: {
-    fontSize: 16,
-    marginBottom: 8,
-  },
-  module: {
-    fontSize: 14,
-    marginTop: 4,
-    textAlign: 'center',
+function mapStateToProps({user}){
+  return {
+    isAuthed: user.isAuthed,
+    isFetching: user.isFetching
   }
-});
+}
+
+function mapDispatchToProps(dispatch){
+  return bindActionCreators(userActionCreators, dispatch)
+}
+
+export default connect(mapStateToProps, mapDispatchToProps)(App)
+
+

@@ -102,7 +102,7 @@ android {
     buildToolsVersion "23.0.1"
 
     defaultConfig {
-        applicationId "com.invertase.rnfirebasestarter"
+        applicationId "com.funvego.android"
         minSdkVersion 16
         targetSdkVersion 22
         versionCode 1
@@ -150,6 +150,9 @@ dependencies {
     compile(project(':react-native-firebase')) {
         transitive = false
     }
+
+    //vector icons
+    compile project(':react-native-vector-icons')
 
     // RNFirebase required dependencies
     compile "com.google.firebase:firebase-core:11.6.0"
